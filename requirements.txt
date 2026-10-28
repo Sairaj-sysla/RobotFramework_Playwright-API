@@ -1,5 +1,12 @@
 # Python runtime for Robot Framework. Tested with Python 3.13 on Windows 11.
+# Browser Library is installed through Browser Batteries ([bb] extra): the Playwright wrapper and
+# its own Node.js come inside the robotframework-browser-batteries wheel, so 'rfbrowser init' is
+# NOT used. Install browsers with 'rfbrowser install chromium'. See docs/adr/0002-*.md.
 # Full tested dependency set (including transitive packages): requirements-lock.txt
 #   python -m pip install -r requirements.txt -c requirements-lock.txt
 robotframework==7.5
-robotframework-browser==20.6.0
+robotframework-browser[bb]==20.6.0
+# Must always equal the robotframework-browser version.
+robotframework-browser-batteries==20.6.0
+# Reads the Excel test data (libraries/ExcelTestData.py).
+openpyxl==3.1.5

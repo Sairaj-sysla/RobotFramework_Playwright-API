@@ -1,8 +1,10 @@
-# Output of 'pip freeze' for the tested environment (Python 3.13.14, 2026-10-14). Used as constraints.
+# Output of 'pip freeze' for the tested environment (Python 3.13.14, Browser Batteries route, 2026-10-16; openpyxl added 2026-10-19). Used as constraints.
 click==8.5.0
+et_xmlfile==2.0.0
 grpcio==1.84.0
 grpcio-tools==1.84.0
 natsort==8.4.0
+openpyxl==3.1.5
 overrides==7.7.0
 protobuf==7.35.1
 psutil==7.2.2
@@ -10,6 +12,7 @@ PyYAML==6.0.3
 robotframework==7.5
 robotframework-assertion-engine==5.0.1
 robotframework-browser==20.6.0
+robotframework-browser-batteries==20.6.0
 robotframework-pythonlibcore==4.6.0
 seedir==0.5.1
 setuptools==84.0.0

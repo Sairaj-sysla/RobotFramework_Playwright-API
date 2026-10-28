@@ -36,18 +36,32 @@ export function splitRobotArgs(args: readonly string[]): SplitArgs {
   return { options, dataSources: args.slice(index) };
 }
 
+/** The output directory Robot will use: the last `--outputdir`/`-d` the user gave, else `fallback`. */
+export function effectiveOutputDir(args: readonly string[], fallback: string): string {
+  const { options } = splitRobotArgs(args);
+  let outputDir = fallback;
+  for (let index = 0; index < options.length; index++) {
+    const option = options[index]!;
+    if (option === '--outputdir' || option === '-d') outputDir = options[index + 1] ?? outputDir;
+    else if (option.startsWith('--outputdir=')) outputDir = option.slice('--outputdir='.length);
+  }
+  return outputDir;
+}
+
 export interface RobotCommandOptions {
   resultsDir: string;
   defaultDataSource: string;
-  /** Tag excluded unless the user's arguments mention it. */
-  excludedByDefault: string;
+  /** Tags excluded unless the user's arguments mention them (each tag is checked on its own). */
+  excludedByDefault: readonly string[];
 }
 
 export function buildRobotArgs(userArgs: readonly string[], options: RobotCommandOptions): string[] {
   const { options: userOptions, dataSources } = splitRobotArgs(userArgs);
   const args = ['-m', 'robot', '--outputdir', options.resultsDir];
   if (!userOptions.some((opt) => opt === '-L' || opt.startsWith('--loglevel'))) args.push('--loglevel', 'DEBUG:INFO');
-  if (!userArgs.some((arg) => arg.includes(options.excludedByDefault))) args.push('--exclude', options.excludedByDefault);
+  for (const tag of options.excludedByDefault) {
+    if (!userArgs.some((arg) => arg.toLowerCase().includes(tag))) args.push('--exclude', tag);
+  }
   // User options come last so they override the defaults above (Robot uses the last value).
   return [...args, ...userOptions, ...(dataSources.length ? dataSources : [options.defaultDataSource])];
 }

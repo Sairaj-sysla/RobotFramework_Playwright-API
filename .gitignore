@@ -9,6 +9,7 @@ dist/
 .env
 .env.*
 !.env.example
+!.env.*.example
 
 # Test results and Browser library artifacts
 results/
@@ -25,3 +26,7 @@ browser/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Python bytecode (libraries/)
+__pycache__/
+*.pyc

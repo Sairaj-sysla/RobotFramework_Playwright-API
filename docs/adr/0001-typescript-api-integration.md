@@ -1,6 +1,8 @@
 # ADR 0001 — Exposing TypeScript API keywords to Robot Framework
 
-- Status: Accepted (validated by an executable spike on 2026-10-14)
+- Status: Superseded on 2026-10-19 – the API layer (remote server, API keywords, demo app) was removed
+  when the framework became ProjectBase UI-only. Kept as a historical record.
+- Originally accepted (validated by an executable spike on 2026-10-14)
 - Context versions: Robot Framework 7.5, robotframework-browser 20.6.0 (Playwright 1.63.0), Node.js 24.16, Python 3.13
 
 ## Context
@@ -77,7 +79,7 @@ documentation, so library information must contain an `__init__` entry.
 - Return values are logged by Robot at INFO level, so the API keywords return sanitized
   headers/bodies (see `src/utils/sanitize.ts`). Auth tokens never pass through Robot: the server
   reads `API_TOKEN` from its own environment.
-- The protocol code is owned by this project, so `test/unit/xmlRpc.test.ts` and the Robot
+- The protocol code is owned by this project, so `test/unit/remote.test.ts` (XML-RPC codec, keyword binding, request guard) and the Robot
   suites act as its compatibility tests when Robot Framework is upgraded.
 
 ## Local and CI usage

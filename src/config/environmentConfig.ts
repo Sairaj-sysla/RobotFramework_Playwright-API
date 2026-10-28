@@ -7,29 +7,30 @@ import { ConfigurationError } from '../utils/errorHandler.js';
 import { isLogLevel, type LogLevel } from '../utils/logger.js';
 
 export type BrowserName = 'chromium' | 'firefox' | 'webkit';
+/** Installed browsers Playwright can drive instead of its own Chromium build (`chromium` only). */
+export const BROWSER_CHANNELS = ['chrome', 'chrome-beta', 'msedge', 'msedge-beta', 'msedge-dev'] as const;
+export type BrowserChannel = (typeof BROWSER_CHANNELS)[number];
 
 export interface FrameworkConfig {
   environment: string;
+  /** ProjectBase URL; also the fallback for EASY_URL (OrangeHRM suite). */
   baseUrl: string;
-  apiBaseUrl: string;
-  /** Secret. Never log; use summarizeConfig() for output. */
-  apiToken: string;
+  /** OrangeHRM login page (`getEasyURL()`); empty = use baseUrl. */
+  easyUrl: string;
+  /** Excel workbook with the OrangeHRM login rows. */
+  orangeLoginWorkbook: string;
   appUsername: string;
   /** Secret. Never log; use summarizeConfig() for output. */
   appPassword: string;
   browser: BrowserName;
+  /** System browser channel (chromium only); undefined = Playwright's bundled Chromium. */
+  browserChannel: BrowserChannel | undefined;
   headless: boolean;
   browserTimeoutMs: number;
   navigationTimeoutMs: number;
   browserTracing: boolean;
-  apiTimeoutMs: number;
-  apiRetries: number;
   logLevel: LogLevel;
   resultsDir: string;
-  remoteHost: string;
-  remotePort: number;
-  startDemoApp: boolean;
-  demoAppPort: number;
 }
 
 type Env = Record<string, string | undefined>;
@@ -92,6 +93,10 @@ class Reader {
     this.problems.push(`${name} must be one of ${allowed.join(', ')}, got '${value}'`);
     return fallback;
   }
+
+  optionalOneOf<T extends string>(name: string, allowed: readonly T[]): T | undefined {
+    return this.raw(name) === undefined ? undefined : this.oneOf(name, allowed, allowed[0]!);
+  }
 }
 
 /** Parses and validates configuration. Throws one error listing every problem. */
@@ -102,28 +107,25 @@ export function parseConfig(env: Env): FrameworkConfig {
 
   const config: FrameworkConfig = {
     environment: read.optional('TEST_ENV', 'local'),
-    baseUrl: read.url('BASE_URL'),
-    apiBaseUrl: read.url('API_BASE_URL'),
-    apiToken: read.required('API_TOKEN'),
-    appUsername: read.required('APP_USERNAME'),
-    appPassword: read.required('APP_PASSWORD'),
+    // Which of these a run needs depends on the suites: each suite setup validates its own
+    // (ProjectBase: BASE_URL, APP_USERNAME, APP_PASSWORD; OrangeHRM: ORANGE_LOGIN_WORKBOOK).
+    baseUrl: read.url('BASE_URL', false),
+    easyUrl: read.url('EASY_URL', false),
+    orangeLoginWorkbook: read.optional('ORANGE_LOGIN_WORKBOOK', ''),
+    appUsername: read.optional('APP_USERNAME', ''),
+    appPassword: read.optional('APP_PASSWORD', ''),
     browser: read.oneOf('BROWSER', ['chromium', 'firefox', 'webkit'] as const, 'chromium'),
+    browserChannel: read.optionalOneOf('BROWSER_CHANNEL', BROWSER_CHANNELS),
     headless: read.boolean('HEADLESS', true),
     browserTimeoutMs: read.integer('BROWSER_TIMEOUT_MS', 10_000, 100, 300_000),
-    navigationTimeoutMs: read.integer('NAVIGATION_TIMEOUT_MS', 15_000, 100, 300_000),
+    navigationTimeoutMs: read.integer('NAVIGATION_TIMEOUT_MS', 30_000, 100, 300_000),
     browserTracing: read.boolean('BROWSER_TRACING', false),
-    apiTimeoutMs: read.integer('API_TIMEOUT_MS', 10_000, 100, 300_000),
-    apiRetries: read.integer('API_RETRIES', 1, 0, 5),
     logLevel: isLogLevel(logLevel) ? logLevel : 'info',
     resultsDir: read.optional('RESULTS_DIR', 'results'),
-    remoteHost: read.optional('REMOTE_HOST', '127.0.0.1'),
-    remotePort: read.integer('REMOTE_PORT', 8270, 1, 65_535),
-    startDemoApp: read.boolean('START_DEMO_APP', true),
-    demoAppPort: read.integer('DEMO_APP_PORT', 3000, 1, 65_535),
   };
 
-  if (config.apiToken && config.apiToken.length < 16) {
-    read.problems.push('API_TOKEN must be at least 16 characters');
+  if (config.browserChannel && config.browser !== 'chromium') {
+    read.problems.push(`BROWSER_CHANNEL '${config.browserChannel}' requires BROWSER=chromium, got '${config.browser}'`);
   }
   if (read.problems.length) {
     throw new ConfigurationError(
@@ -137,7 +139,7 @@ export function parseConfig(env: Env): FrameworkConfig {
 export function summarizeConfig(config: FrameworkConfig): Record<string, unknown> {
   return {
     ...config,
-    apiToken: config.apiToken ? '***set***' : '***missing***',
+    browserChannel: config.browserChannel ?? null,
     appPassword: config.appPassword ? '***set***' : '***missing***',
   };
 }

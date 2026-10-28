@@ -15,6 +15,11 @@ const SENSITIVE_HEADERS = new Set([
 
 const SENSITIVE_KEY = /pass(word|wd)?$|secret|token|api[-_]?key|authorization|credential|session[-_]?id/i;
 
+/** True if any segment of a dot path (e.g. `headers.x-api-key`) names a sensitive field. */
+export function isSensitivePath(fieldPath: string): boolean {
+  return fieldPath.split('.').some((segment) => SENSITIVE_KEY.test(segment) || SENSITIVE_HEADERS.has(segment.toLowerCase()));
+}
+
 export function sanitizeHeaders(headers: Record<string, string>): Record<string, string> {
   const result: Record<string, string> = {};
   for (const [name, value] of Object.entries(headers)) {

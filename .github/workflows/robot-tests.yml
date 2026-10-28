@@ -1,38 +1,47 @@
-name: Robot Framework tests
+name: Robot Framework tests (ProjectBase)
+
+# Runs the ProjectBase UI suite against a real environment. Requires repository secrets:
+#   PROJECTBASE_BASE_URL, PROJECTBASE_USERNAME, PROJECTBASE_PASSWORD
+# Automatic runs exclude the 'negative' tag: the invalid-password test makes one failed login per
+# run for the configured account, which could trigger an account lockout.
+# The OrangeHRM suite (tag 'orangehrm') is excluded: its Excel workbook is not in this repository.
 
 on:
   push:
     branches: [main]
   pull_request:
   schedule:
-    - cron: '0 2 * * 1-5' # nightly regression, weekdays 02:00 UTC
+    - cron: '0 2 * * 1-5' # nightly, weekdays 02:00 UTC
   workflow_dispatch:
     inputs:
-      suite:
-        description: Which tests to run
-        type: choice
-        options: [smoke, regression, api, web, integration]
-        default: smoke
+      include_negative:
+        description: Also run negative tests (one failed login for the test account per run)
+        type: boolean
+        default: false
+      tracing:
+        description: Record Playwright traces (password redacted after the run, included in the artifact)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 concurrency:
-  group: robot-${{ github.ref }}
-  cancel-in-progress: true
+  # One run at a time against the shared test account.
+  group: robot-projectbase
+  cancel-in-progress: false
 
 jobs:
   test:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 20
     env:
-      # Push/PR -> smoke, schedule -> regression, manual -> chosen suite
-      SUITE: ${{ github.event.inputs.suite || (github.event_name == 'schedule' && 'regression') || 'smoke' }}
       TEST_ENV: ci
-      BASE_URL: http://127.0.0.1:3000
-      API_BASE_URL: http://127.0.0.1:3000/api
       HEADLESS: 'true'
       BROWSER: chromium
+      NAVIGATION_TIMEOUT_MS: '30000'
+      BROWSER_TRACING: ${{ github.event.inputs.tracing == 'true' && 'true' || 'false' }}
+      ROBOT_EXCLUDE: ${{ github.event.inputs.include_negative == 'true' && 'NONE' || 'negative' }}
       ROBOT_PYTHON: python
     steps:
       - uses: actions/checkout@v7
@@ -53,46 +62,64 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
-      - name: Compile TypeScript
-        run: npm run build
+      - name: Compile and type-check TypeScript
+        run: |
+          npm run build
+          npm run typecheck
 
       - name: Unit tests (TypeScript)
         run: node --test "dist/test/unit/*.test.js"
 
-      - name: Install Browser library node dependencies and Chromium
-        run: rfbrowser init --with-deps chromium
+      - name: Install Chromium for Browser Batteries
+        # Browser Batteries bundles the Playwright wrapper and its Node.js, so 'rfbrowser init' is
+        # not used. --with-deps installs the Linux system libraries Chromium needs.
+        run: rfbrowser install --with-deps chromium
 
-      - name: Configure credentials
-        # Use repository secrets when they exist (needed for a real environment). For the bundled
-        # demo app, generate throw-away values per run. Values are masked in the job log.
+      - name: Configure ProjectBase credentials
+        # Secrets are not available to pull requests from forks; fail with a clear message instead
+        # of running against nothing.
         env:
-          SECRET_API_TOKEN: ${{ secrets.API_TOKEN }}
-          SECRET_APP_USERNAME: ${{ secrets.APP_USERNAME }}
-          SECRET_APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
+          SECRET_BASE_URL: ${{ secrets.PROJECTBASE_BASE_URL }}
+          SECRET_USERNAME: ${{ secrets.PROJECTBASE_USERNAME }}
+          SECRET_PASSWORD: ${{ secrets.PROJECTBASE_PASSWORD }}
         run: |
-          token="${SECRET_API_TOKEN:-$(openssl rand -hex 24)}"
-          password="${SECRET_APP_PASSWORD:-$(openssl rand -hex 12)}"
-          echo "::add-mask::$token"
-          echo "::add-mask::$password"
+          if [ -z "$SECRET_BASE_URL" ] || [ -z "$SECRET_USERNAME" ] || [ -z "$SECRET_PASSWORD" ]; then
+            echo "::error::Repository secrets PROJECTBASE_BASE_URL, PROJECTBASE_USERNAME and PROJECTBASE_PASSWORD must be set."
+            exit 1
+          fi
+          echo "::add-mask::$SECRET_PASSWORD"
           {
-            echo "API_TOKEN=$token"
-            echo "APP_USERNAME=${SECRET_APP_USERNAME:-ci.user}"
-            echo "APP_PASSWORD=$password"
+            echo "BASE_URL=$SECRET_BASE_URL"
+            echo "APP_USERNAME=$SECRET_USERNAME"
+            echo "APP_PASSWORD=$SECRET_PASSWORD"
           } >> "$GITHUB_ENV"
 
       - name: Validate configuration
         run: node dist/scripts/checkEnv.js
 
-      - name: Run Robot Framework (${{ env.SUITE }})
-        # The orchestrator starts the demo app and the TypeScript remote server, runs Robot,
-        # stops the services and exits with Robot's return code.
-        run: node dist/scripts/runTests.js --include "$SUITE"
+      - name: Run Robot Framework
+        # The orchestrator validates configuration, runs Robot, redacts the password from traces
+        # and exits with Robot's return code.
+        run: node dist/scripts/runTests.js --exclude "$ROBOT_EXCLUDE" --exclude orangehrm
+
+      - name: Test summary
+        if: always()
+        run: |
+          python - <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          import os
+          from robot.api import ExecutionResult
+          if not os.path.exists('results/output.xml'):
+              print('No Robot Framework output (the run failed before tests started).')
+              raise SystemExit
+          stats = ExecutionResult('results/output.xml').statistics.total
+          print(f"### Robot Framework (ProjectBase): {stats.passed} passed, {stats.failed} failed, {stats.skipped} skipped")
+          EOF
 
       - name: Upload Robot Framework results
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: robot-results-${{ env.SUITE }}-${{ github.run_number }}
+          name: robot-results-projectbase-${{ github.run_number }}
           path: results/
           retention-days: 14
           if-no-files-found: warn
