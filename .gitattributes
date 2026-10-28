@@ -1,0 +1,4 @@
+# Normalize line endings in the repository (files are written with both CRLF and LF on Windows)
+* text=auto
+*.png binary
+*.zip binary

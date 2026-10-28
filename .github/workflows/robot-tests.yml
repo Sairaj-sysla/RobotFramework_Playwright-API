@@ -1,0 +1,98 @@
+name: Robot Framework tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '0 2 * * 1-5' # nightly regression, weekdays 02:00 UTC
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: Which tests to run
+        type: choice
+        options: [smoke, regression, api, web, integration]
+        default: smoke
+
+permissions:
+  contents: read
+
+concurrency:
+  group: robot-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      # Push/PR -> smoke, schedule -> regression, manual -> chosen suite
+      SUITE: ${{ github.event.inputs.suite || (github.event_name == 'schedule' && 'regression') || 'smoke' }}
+      TEST_ENV: ci
+      BASE_URL: http://127.0.0.1:3000
+      API_BASE_URL: http://127.0.0.1:3000/api
+      HEADLESS: 'true'
+      BROWSER: chromium
+      ROBOT_PYTHON: python
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+          cache: pip
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install Python dependencies
+        run: python -m pip install -r requirements.txt -c requirements-lock.txt
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Compile TypeScript
+        run: npm run build
+
+      - name: Unit tests (TypeScript)
+        run: node --test "dist/test/unit/*.test.js"
+
+      - name: Install Browser library node dependencies and Chromium
+        run: rfbrowser init --with-deps chromium
+
+      - name: Configure credentials
+        # Use repository secrets when they exist (needed for a real environment). For the bundled
+        # demo app, generate throw-away values per run. Values are masked in the job log.
+        env:
+          SECRET_API_TOKEN: ${{ secrets.API_TOKEN }}
+          SECRET_APP_USERNAME: ${{ secrets.APP_USERNAME }}
+          SECRET_APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
+        run: |
+          token="${SECRET_API_TOKEN:-$(openssl rand -hex 24)}"
+          password="${SECRET_APP_PASSWORD:-$(openssl rand -hex 12)}"
+          echo "::add-mask::$token"
+          echo "::add-mask::$password"
+          {
+            echo "API_TOKEN=$token"
+            echo "APP_USERNAME=${SECRET_APP_USERNAME:-ci.user}"
+            echo "APP_PASSWORD=$password"
+          } >> "$GITHUB_ENV"
+
+      - name: Validate configuration
+        run: node dist/scripts/checkEnv.js
+
+      - name: Run Robot Framework (${{ env.SUITE }})
+        # The orchestrator starts the demo app and the TypeScript remote server, runs Robot,
+        # stops the services and exits with Robot's return code.
+        run: node dist/scripts/runTests.js --include "$SUITE"
+
+      - name: Upload Robot Framework results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: robot-results-${{ env.SUITE }}-${{ github.run_number }}
+          path: results/
+          retention-days: 14
+          if-no-files-found: warn

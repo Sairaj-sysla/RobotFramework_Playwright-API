@@ -1,0 +1,48 @@
+{
+  "name": "robot-playwright-api-framework",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Robot Framework + Browser (Playwright) + TypeScript API automation framework",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=20.12"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "preenv:check": "npm run build",
+    "env:check": "node dist/scripts/checkEnv.js",
+    "pretest:unit": "npm run build",
+    "test:unit": "node --test \"dist/test/unit/*.test.js\"",
+    "pretest": "npm run build",
+    "test": "node dist/scripts/runTests.js",
+    "pretest:web": "npm run build",
+    "test:web": "node dist/scripts/runTests.js --include web",
+    "pretest:api": "npm run build",
+    "test:api": "node dist/scripts/runTests.js --include api",
+    "pretest:integration": "npm run build",
+    "test:integration": "node dist/scripts/runTests.js --include integration",
+    "pretest:smoke": "npm run build",
+    "test:smoke": "node dist/scripts/runTests.js --include smoke",
+    "pretest:regression": "npm run build",
+    "test:regression": "node dist/scripts/runTests.js --include regression",
+    "pretest:failure-demo": "npm run build",
+    "test:failure-demo": "node dist/scripts/runTests.js --include intentional-failure",
+    "prerobot": "npm run build",
+    "robot": "node dist/scripts/runTests.js",
+    "preremote:start": "npm run build",
+    "remote:start": "node dist/src/remote/main.js",
+    "predemo:start": "npm run build",
+    "demo:start": "node dist/demo-app/server.js",
+    "remote:stop": "node dist/scripts/stopRemote.js"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "playwright-core": "1.63.0",
+    "typescript": "6.0.3"
+  },
+  "dependencies": {
+    "fast-xml-parser": "5.11.2"
+  }
+}

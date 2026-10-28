@@ -1,0 +1,5 @@
+# Python runtime for Robot Framework. Tested with Python 3.13 on Windows 11.
+# Full tested dependency set (including transitive packages): requirements-lock.txt
+#   python -m pip install -r requirements.txt -c requirements-lock.txt
+robotframework==7.5
+robotframework-browser==20.6.0

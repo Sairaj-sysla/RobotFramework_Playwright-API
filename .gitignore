@@ -1,0 +1,27 @@
+# Dependencies / environments
+node_modules/
+.venv/
+
+# Build output
+dist/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+
+# Test results and Browser library artifacts
+results/
+log.html
+report.html
+output.xml
+playwright-log.txt
+browser/
+
+# Editors / OS
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db

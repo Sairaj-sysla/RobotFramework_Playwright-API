@@ -1,0 +1,20 @@
+{
+  "SEEDED_ADMIN": {
+    "name": "Ada Lovelace",
+    "email": "ada@example.test",
+    "role": "admin",
+    "status": "Active"
+  },
+  "USER_ROLES": ["viewer", "editor", "admin"],
+  "INVALID_USER_PAYLOADS": [
+    {"description": "missing email", "body": {"name": "No Email"}, "error": "email must be a valid email address"},
+    {"description": "invalid email", "body": {"name": "Bad Email", "email": "not-an-email"}, "error": "email must be a valid email address"},
+    {"description": "name too short", "body": {"name": "A", "email": "short.name@example.test"}, "error": "name must be a string of 2-100 characters"},
+    {"description": "unknown role", "body": {"name": "Odd Role", "email": "odd.role@example.test", "role": "owner"}, "error": "role must be one of viewer, editor, admin"}
+  ],
+  "LOGIN_MESSAGES": {
+    "invalid": "Invalid username or password.",
+    "missing": "Username and password are required.",
+    "signed_out": "You have been signed out."
+  }
+}
